@@ -69,6 +69,8 @@ func (we *WorkEstimate) MaxSeats() int {
 // number of objects for a given resource.
 type objectCountGetterFunc func(string) (int64, error)
 
+type KcpObjectCountGetterFunc func(string, string) (int64, error)
+
 // watchCountGetterFunc represents a function that gets the total
 // number of watchers potentially interested in a given request.
 type watchCountGetterFunc func(*apirequest.RequestInfo) int
@@ -79,6 +81,14 @@ type watchCountGetterFunc func(*apirequest.RequestInfo) int
 func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
 		listWorkEstimator:     newListWorkEstimator(objectCountFn),
+		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
+	}
+	return estimator.estimate
+}
+
+func NewKcpWorkEstimator(objectCountFn KcpObjectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
+	estimator := &workEstimator{
+		listWorkEstimator:     newKcpListWorkEstimator(objectCountFn),
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
 	}
 	return estimator.estimate

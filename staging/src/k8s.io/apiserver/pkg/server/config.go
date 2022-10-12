@@ -231,7 +231,12 @@ type Config struct {
 
 	// StorageObjectCountTracker is used to keep track of the total number of objects
 	// in the storage per resource, so we can estimate width of incoming requests.
-	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+	StorageObjectCountTracker    flowcontrolrequest.StorageObjectCountTracker
+	KcpStorageObjectCountTracker flowcontrolrequest.KcpStorageObjectCountTracker
+	// ClusterAwareStorageObjectCountTracker flowcontrolrequest.ClusterAwareStorageObjectCountTracker
+
+	StorageObjectCountGetterRegistry flowcontrolrequest.StorageObjectCountGetterRegistry
+	KcpObjectCountGetterFunc         flowcontrolrequest.KcpObjectCountGetterFunc
 
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
@@ -369,12 +374,13 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:          lifecycleSignals,
-		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
-
-		APIServerID:           id,
-		StorageVersionManager: storageversion.NewDefaultManager(),
+		LongRunningFunc:                  genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals:                 lifecycleSignals,
+		StorageObjectCountTracker:        flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		KcpStorageObjectCountTracker:     flowcontrolrequest.NewKcpObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		StorageObjectCountGetterRegistry: flowcontrolrequest.NewStorageObjectCountGetterRegistry(),
+		APIServerID:                      id,
+		StorageVersionManager:            storageversion.NewDefaultManager(),
 	}
 }
 
@@ -796,8 +802,10 @@ func DefaultBuildHandlerChainFromAuthz(apiHandler http.Handler, c *Config) http.
 func DefaultBuildHandlerChainBeforeAuthz(apiHandler http.Handler, c *Config) http.Handler {
 	handler := apiHandler
 	if c.FlowControl != nil {
-		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount)
+		// requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount)
+		requestWorkEstimator := flowcontrolrequest.NewKcpWorkEstimator(c.KcpStorageObjectCountTracker.GetObjectCount, c.FlowControl.GetInterestedWatchCount)
 		handler = filterlatency.TrackCompleted(handler)
+		// TODO: might need to change WithPriorityAndFairness so that it works with delegating work estimator
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
