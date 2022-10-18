@@ -31,11 +31,12 @@ type RESTOptions struct {
 	StorageConfig *storagebackend.ConfigForResource
 	Decorator     StorageDecorator
 
-	EnableGarbageCollection   bool
-	DeleteCollectionWorkers   int
-	ResourcePrefix            string
-	CountMetricPollPeriod     time.Duration
-	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+	EnableGarbageCollection          bool
+	DeleteCollectionWorkers          int
+	ResourcePrefix                   string
+	CountMetricPollPeriod            time.Duration
+	StorageObjectCountTracker        flowcontrolrequest.StorageObjectCountTracker
+	StorageObjectCountGetterRegistry flowcontrolrequest.StorageObjectCountGetterRegistry
 }
 
 // Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)

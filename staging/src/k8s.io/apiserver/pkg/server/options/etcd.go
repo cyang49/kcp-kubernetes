@@ -200,6 +200,7 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 
 	// use the StorageObjectCountTracker interface instance from server.Config
 	s.StorageConfig.StorageObjectCountTracker = c.StorageObjectCountTracker
+	s.StorageConfig.StorageObjectCountGetterRegistry = c.StorageObjectCountGetterRegistry
 
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{
 		Options:              *s,
@@ -215,6 +216,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 
 	// use the StorageObjectCountTracker interface instance from server.Config
 	s.StorageConfig.StorageObjectCountTracker = c.StorageObjectCountTracker
+	s.StorageConfig.StorageObjectCountGetterRegistry = c.StorageObjectCountGetterRegistry
 
 	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
@@ -258,6 +260,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		ResourcePrefix:            groupName + "/" + resource.Resource,
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
+		StorageObjectCountGetterRegistry: f.Options.StorageConfig.StorageObjectCountGetterRegistry,
 	}
 	if f.TransformerOverrides != nil {
 		if transformer, ok := f.TransformerOverrides[resource]; ok {
@@ -301,6 +304,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		ResourcePrefix:            f.StorageFactory.ResourcePrefix(resource),
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
+		StorageObjectCountGetterRegistry: f.Options.StorageConfig.StorageObjectCountGetterRegistry,
 	}
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)

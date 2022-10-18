@@ -89,7 +89,8 @@ type Config struct {
 
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
-	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+	StorageObjectCountTracker        flowcontrolrequest.StorageObjectCountTracker
+	StorageObjectCountGetterRegistry flowcontrolrequest.StorageObjectCountGetterRegistry
 }
 
 // ConfigForResource is a Config specialized to a particular `schema.GroupResource`

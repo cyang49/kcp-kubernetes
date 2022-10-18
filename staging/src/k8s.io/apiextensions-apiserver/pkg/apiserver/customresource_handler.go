@@ -1288,25 +1288,27 @@ func (d unstructuredDefaulter) Default(in runtime.Object) {
 }
 
 type CRDRESTOptionsGetter struct {
-	StorageConfig             storagebackend.Config
-	StoragePrefix             string
-	EnableWatchCache          bool
-	DefaultWatchCacheSize     int
-	EnableGarbageCollection   bool
-	DeleteCollectionWorkers   int
-	CountMetricPollPeriod     time.Duration
-	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+	StorageConfig                    storagebackend.Config
+	StoragePrefix                    string
+	EnableWatchCache                 bool
+	DefaultWatchCacheSize            int
+	EnableGarbageCollection          bool
+	DeleteCollectionWorkers          int
+	CountMetricPollPeriod            time.Duration
+	StorageObjectCountTracker        flowcontrolrequest.StorageObjectCountTracker
+	StorageObjectCountGetterRegistry flowcontrolrequest.StorageObjectCountGetterRegistry
 }
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:             t.StorageConfig.ForResource(resource),
-		Decorator:                 generic.UndecoratedStorage,
-		EnableGarbageCollection:   t.EnableGarbageCollection,
-		DeleteCollectionWorkers:   t.DeleteCollectionWorkers,
-		ResourcePrefix:            resource.Group + "/" + resource.Resource,
-		CountMetricPollPeriod:     t.CountMetricPollPeriod,
-		StorageObjectCountTracker: t.StorageObjectCountTracker,
+		StorageConfig:                    t.StorageConfig.ForResource(resource),
+		Decorator:                        generic.UndecoratedStorage,
+		EnableGarbageCollection:          t.EnableGarbageCollection,
+		DeleteCollectionWorkers:          t.DeleteCollectionWorkers,
+		ResourcePrefix:                   resource.Group + "/" + resource.Resource,
+		CountMetricPollPeriod:            t.CountMetricPollPeriod,
+		StorageObjectCountTracker:        t.StorageObjectCountTracker,
+		StorageObjectCountGetterRegistry: t.StorageObjectCountGetterRegistry, // FIXME: not sure if this is needed for object count tracking
 	}
 	if t.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher()

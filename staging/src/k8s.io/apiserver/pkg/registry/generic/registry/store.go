@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -929,13 +930,13 @@ func markAsDeleting(obj runtime.Object, now time.Time) (err error) {
 // grace period seconds (graceful deletion) and updating the list of
 // finalizers (finalization); it returns:
 //
-// 1. an error
-// 2. a boolean indicating that the object was not found, but it should be
-//    ignored
-// 3. a boolean indicating that the object's grace period is exhausted and it
-//    should be deleted immediately
-// 4. a new output object with the state that was updated
-// 5. a copy of the last existing state of the object
+//  1. an error
+//  2. a boolean indicating that the object was not found, but it should be
+//     ignored
+//  3. a boolean indicating that the object's grace period is exhausted and it
+//     should be deleted immediately
+//  4. a new output object with the state that was updated
+//  5. a copy of the last existing state of the object
 func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, deleteValidation rest.ValidateObjectFunc, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
@@ -1477,6 +1478,20 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.StorageVersioner = opts.StorageConfig.EncodeVersioner
 
 		if opts.CountMetricPollPeriod > 0 {
+			if opts.StorageObjectCountGetterRegistry != nil {
+				opts.StorageObjectCountGetterRegistry.Register(e.DefaultQualifiedResource.String(),
+					func(clusterName logicalcluster.Name) int64 {
+						prefix := e.KeyRootFunc(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: clusterName}))
+						count, err := e.Storage.Count(prefix)
+						if err != nil {
+							klog.V(5).InfoS("Failed to update storage count metric", "err", err)
+							count = -1
+						}
+						return count
+					},
+				)
+			}
+
 			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker)
 			previousDestroy := e.DestroyFunc
 			var once sync.Once

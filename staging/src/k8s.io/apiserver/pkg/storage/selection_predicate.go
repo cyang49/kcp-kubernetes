@@ -27,6 +27,14 @@ import (
 // In any failure to parse given object, it returns error.
 type AttrFunc func(obj runtime.Object) (labels.Set, fields.Set, error)
 
+// // ObjectCountGetterFunc is created with specific object type and called by observers
+// // specifying the cluster name to count the number of objects within a cluster
+// type ObjectCountGetterFunc func(clusterName logicalcluster.Name) int64
+
+// // RegisterObjectCountGetterFunc is called during NewREST to register the count getter function
+// // with an SOCTController registry
+// type RegisterObjectCountGetterFunc func(resource string, f ObjectCountGetterFunc) error
+
 // FieldMutationFunc allows the mutation of the field selection fields.  It is mutating to
 // avoid the extra allocation on this common path
 type FieldMutationFunc func(obj runtime.Object, fieldSet fields.Set) error

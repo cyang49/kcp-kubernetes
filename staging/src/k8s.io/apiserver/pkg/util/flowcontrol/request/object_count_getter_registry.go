@@ -22,7 +22,7 @@ func NewStorageObjectCountGetterRegistry() StorageObjectCountGetterRegistry {
 }
 
 type storageObjectCountGetterRegistry struct {
-	lock     sync.RWMutex // TODO: is the RWMutex a good enough solution for synchronization? 
+	lock     sync.RWMutex
 	registry map[string]StorageObjectCountGetterFunc
 }
 
