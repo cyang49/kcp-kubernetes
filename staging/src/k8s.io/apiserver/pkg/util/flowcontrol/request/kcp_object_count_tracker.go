@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"sync"
+	"k8s.io/klog/v2"
 )
 
 // KcpStorageObjectCountTracker is an interface for the operations
@@ -101,6 +102,7 @@ func (c *kcpStorageObjectCountTracker) StartObserving(cluster string, resource s
 	if !ok {
 		return // should return error?
 	}
+	klog.Infof("StartObserving %s - %s", cluster, resource)
 	tracker.StartObserving(resource, getterFunc)
 }
 

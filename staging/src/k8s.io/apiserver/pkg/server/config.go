@@ -233,7 +233,6 @@ type Config struct {
 	// in the storage per resource, so we can estimate width of incoming requests.
 	StorageObjectCountTracker    flowcontrolrequest.StorageObjectCountTracker
 	KcpStorageObjectCountTracker flowcontrolrequest.KcpStorageObjectCountTracker
-	// ClusterAwareStorageObjectCountTracker flowcontrolrequest.ClusterAwareStorageObjectCountTracker
 
 	StorageObjectCountGetterRegistry flowcontrolrequest.StorageObjectCountGetterRegistry
 	KcpObjectCountGetterFunc         flowcontrolrequest.KcpObjectCountGetterFunc

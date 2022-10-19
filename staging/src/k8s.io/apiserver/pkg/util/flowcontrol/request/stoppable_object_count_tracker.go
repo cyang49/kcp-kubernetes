@@ -46,6 +46,10 @@ func (t *stoppableStorageObjectCountTracker) Stop() {
 }
 
 func (t *stoppableStorageObjectCountTracker) StartObserving(resource string, getterFunc func() int64) {
+	if _, ok := t.observers[resource]; ok {
+		return
+	}
+
 	observer := newStoppableObserver(
 		getterFunc,
 		func(count int64) { t.Set(resource, count) },
