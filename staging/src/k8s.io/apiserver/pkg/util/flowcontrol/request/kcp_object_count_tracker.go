@@ -1,8 +1,10 @@
 package request
 
 import (
+	"context"
 	"fmt"
 	"sync"
+
 	"k8s.io/klog/v2"
 )
 
@@ -18,7 +20,7 @@ type KcpStorageObjectCountTracker interface {
 	// SetObjectCount(cluster string, resource string, count int64)
 
 	// CreateTracker is used by SOCT controller to create tracker of a new cluster
-	CreateTracker(cluster string)
+	CreateTracker(ctx context.Context, cluster string)
 	// DeleteTracker is used by SOCT controller to delete tracker when a cluster is deleted
 	DeleteTracker(cluster string)
 
@@ -31,17 +33,18 @@ type kcpStorageObjectCountTracker struct {
 	// trackers maps from a cluster name string to a k8s storage object count tracker
 	// suppose there are N logical clusters, there should be N trackers
 	trackers map[string]*stoppableStorageObjectCountTracker
-	// There is one stop channel that will stop all trackers
-	stopCh <-chan struct{}
+
+	// This stop channel that will stop all trackers across all logical clusters
+	globalStopCh <-chan struct{}
 }
 
 var _ KcpStorageObjectCountTracker = &kcpStorageObjectCountTracker{}
 
-func NewKcpObjectCountTracker(stopCh <-chan struct{}) *kcpStorageObjectCountTracker {
+func NewKcpObjectCountTracker(globalStopCh <-chan struct{}) *kcpStorageObjectCountTracker {
 	return &kcpStorageObjectCountTracker{
-		lock:     sync.RWMutex{},
-		trackers: map[string]*stoppableStorageObjectCountTracker{},
-		stopCh:   stopCh,
+		lock:         sync.RWMutex{},
+		trackers:     map[string]*stoppableStorageObjectCountTracker{},
+		globalStopCh: globalStopCh,
 	}
 }
 
@@ -57,21 +60,8 @@ func (c *kcpStorageObjectCountTracker) GetObjectCount(cluster string, resource s
 	return tracker.Get(resource)
 }
 
-// // SetObjectCount implements KcpObjectCountTracker
-// func (c *kcpStorageObjectCountTracker) SetObjectCount(cluster string, key string, count int64) {
-// 	panic("SetObjectCount unimplemented") // this function is not really used because observers has access to trackers. remove?
-// 	// c.lock.RLock()
-// 	// defer c.lock.RUnlock()
-// 	// tracker, ok := c.trackers[cluster]
-// 	// if !ok {
-// 	// 	// TODO: should return error here?
-// 	// 	return
-// 	// }
-// 	// tracker.Set(key, count)
-// }
-
 // CreateTracker implements KcpObjectCountTracker
-func (c *kcpStorageObjectCountTracker) CreateTracker(cluster string) {
+func (c *kcpStorageObjectCountTracker) CreateTracker(ctx context.Context, cluster string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -79,7 +69,21 @@ func (c *kcpStorageObjectCountTracker) CreateTracker(cluster string) {
 		return // should return error?
 	}
 
-	c.trackers[cluster] = newStoppableStorageObjectCountTracker(c.stopCh)
+	// create cluster specific stopCh that will be closed either when the call context is canceled
+	// or when the global stop signal is received
+	stopCh := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			close(stopCh)
+		case <-c.globalStopCh:
+			close(stopCh)
+		case <-stopCh: // this is needed (?) for a cluster specific stop caused by a DeleteTracker call
+			return
+		}
+	}()
+
+	c.trackers[cluster] = newStoppableStorageObjectCountTracker(stopCh)
 }
 
 // DeleteTracker delete the tracker of a specific cluster
@@ -92,12 +96,14 @@ func (c *kcpStorageObjectCountTracker) DeleteTracker(cluster string) {
 		return // should return error?
 	}
 
+	// Send stop signal to the cluster specific tracker
 	t.Stop()
 	delete(c.trackers, cluster)
 }
 
 func (c *kcpStorageObjectCountTracker) StartObserving(cluster string, resource string, getterFunc func() int64) {
 	c.lock.RLock()
+	defer c.lock.RUnlock()
 	tracker, ok := c.trackers[cluster]
 	if !ok {
 		return // should return error?

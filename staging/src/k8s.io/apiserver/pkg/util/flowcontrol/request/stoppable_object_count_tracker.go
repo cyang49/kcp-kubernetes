@@ -1,10 +1,12 @@
 package request
 
+// stoppableStorageObjectCountTracker is a cluster scoped
+// storage object count tracker
 type stoppableStorageObjectCountTracker struct {
 	tracker StorageObjectCountTracker
 	// stopCh is a cluster local stop channel that
 	// will be used to broadcast stop signals to all
-	// observers of this channel
+	// observers of this tracker
 	stopCh    chan struct{}
 	observers map[string]*storageObjectCountObserver
 }
