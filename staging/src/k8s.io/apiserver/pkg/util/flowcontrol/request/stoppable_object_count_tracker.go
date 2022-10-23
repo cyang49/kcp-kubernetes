@@ -1,28 +1,32 @@
 package request
 
+import "sync"
+
 // stoppableStorageObjectCountTracker is a cluster scoped
 // storage object count tracker
 type stoppableStorageObjectCountTracker struct {
 	tracker StorageObjectCountTracker
-	// stopCh is a cluster local stop channel that
+	// stopCh is a cluster specific stop channel that
 	// will be used to broadcast stop signals to all
 	// observers of this tracker
 	stopCh    chan struct{}
+	lock      sync.RWMutex
 	observers map[string]*storageObjectCountObserver
 }
 
 var _ StorageObjectCountTracker = &stoppableStorageObjectCountTracker{}
 
-// !!FIXME!!: Operations are not thread safe
+// newStoppableStorageObjectCountTracker creates a k8s StorageObjectCountTracker
+// note that it also starts a goroutine for forwarding upstream stop signal
 func newStoppableStorageObjectCountTracker(stopSignal <-chan struct{}) *stoppableStorageObjectCountTracker {
 	stopCh := make(chan struct{})
 
 	// forward upstream stop signal to tracker stop channel
 	go func() {
 		select {
-		case <-stopSignal: // forwards signal and return
+		case <-stopSignal:
 			close(stopCh)
-		case <-stopCh: // no need to forward
+		case <-stopCh:
 		}
 	}()
 
@@ -33,37 +37,45 @@ func newStoppableStorageObjectCountTracker(stopSignal <-chan struct{}) *stoppabl
 	}
 }
 
-// Get implements StorageObjectCountTracker
+// Get function exposes the resource object count stored in the tracker
 func (t *stoppableStorageObjectCountTracker) Get(resource string) (int64, error) {
 	return t.tracker.Get(resource)
 }
 
-// Set implements StorageObjectCountTracker
+// Set function grants write access to the resource object count
 func (t *stoppableStorageObjectCountTracker) Set(resource string, count int64) {
 	t.tracker.Set(resource, count)
 }
 
+// Stop function stops the tracker and also all observers
 func (t *stoppableStorageObjectCountTracker) Stop() {
 	close(t.stopCh)
 }
 
+// StartObserving starts an observer for a specific resource type
+// getterFunc is supplied by the caller for accessing the storage layer
 func (t *stoppableStorageObjectCountTracker) StartObserving(resource string, getterFunc func() int64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	if _, ok := t.observers[resource]; ok {
 		return
 	}
 
-	observer := newStoppableObserver(
+	observer := newStoppableStorageObjectCountObserver(
 		getterFunc,
 		func(count int64) { t.Set(resource, count) },
-		t.stopCh,
 	)
-	observer.start()
+	observer.start(t.stopCh)
 	t.observers[resource] = observer
 }
 
+// StopObserving stops the observer of the specified resource type
 func (t *stoppableStorageObjectCountTracker) StopObserving(resource string) {
-	observer, ok := t.observers[resource]
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
+	observer, ok := t.observers[resource]
 	if !ok {
 		return
 	}

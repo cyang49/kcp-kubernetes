@@ -14,29 +14,32 @@ type storageObjectCountObserver struct {
 	stopCh     chan struct{}
 }
 
-func newStoppableObserver(getterFunc func() int64, setterFunc func(int64), stopSignal <-chan struct{}) *storageObjectCountObserver {
-	stopCh := make(chan struct{})
-
-	// forward tracker stop signal to observer stop channel
-	go func() {
-		select {
-		case <-stopSignal: // forwards signal and return
-			close(stopCh)
-		case <-stopCh: // no need to forward
-		}
-	}()
-
+func newStoppableStorageObjectCountObserver(getterFunc func() int64, setterFunc func(int64)) *storageObjectCountObserver {
 	return &storageObjectCountObserver{
 		getterFunc: getterFunc,
 		setterFunc: setterFunc,
-		stopCh:     stopCh,
+		stopCh:     make(chan struct{}),
 	}
 }
 
-func (o *storageObjectCountObserver) start() {
+// start function creates two goroutines
+// One for forwarding the upstream stop signal to local observer stopCh
+// The other updates the object count by using the getter and setter functions
+func (o *storageObjectCountObserver) start(stopSignal <-chan struct{}) {
+	// For forwarding upstream stop signal to observer stop channel
+	go func() {
+		select {
+		case <-stopSignal:
+			close(o.stopCh)
+		case <-o.stopCh:
+		}
+	}()
+
+	// Observer goroutine
 	go wait.Until(func() { o.setterFunc(o.getterFunc()) }, observePeriod, o.stopCh)
 }
 
+// stop function will stop the observer goroutines
 func (o *storageObjectCountObserver) stop() {
 	close(o.stopCh)
 }

@@ -8,16 +8,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// KcpStorageObjectCountTracker is an interface for the operations
-// on the tracker. The underlying implementation is cluster aware and
+// KcpStorageObjectCountTracker is cluster aware and
 // maintains a dynamic list of cluster specific trackers (reusing k8s trackers)
 type KcpStorageObjectCountTracker interface {
 	// GetObjectCount returns the count of objects for a given cluster and object type
 	// It is used by work estimator in APF
 	GetObjectCount(cluster string, resource string) (int64, error)
-	// SetObjectCount sets the count of objects for a given cluster and object type
-	// It is used by observer threads managed by KCP SOCT controller
-	// SetObjectCount(cluster string, resource string, count int64)
 
 	// CreateTracker is used by SOCT controller to create tracker of a new cluster
 	CreateTracker(ctx context.Context, cluster string)
@@ -31,7 +27,6 @@ type KcpStorageObjectCountTracker interface {
 type kcpStorageObjectCountTracker struct {
 	lock sync.RWMutex
 	// trackers maps from a cluster name string to a k8s storage object count tracker
-	// suppose there are N logical clusters, there should be N trackers
 	trackers map[string]*stoppableStorageObjectCountTracker
 
 	// This stop channel that will stop all trackers across all logical clusters
@@ -48,8 +43,7 @@ func NewKcpObjectCountTracker(globalStopCh <-chan struct{}) *kcpStorageObjectCou
 	}
 }
 
-// GetObjectCount looks for the cluster name in an http request to get the
-// object count of a specific object type in a specific cluster
+// GetObjectCount gets the object count of a specific resource object type in a specific cluster
 func (c *kcpStorageObjectCountTracker) GetObjectCount(cluster string, resource string) (int64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -60,7 +54,8 @@ func (c *kcpStorageObjectCountTracker) GetObjectCount(cluster string, resource s
 	return tracker.Get(resource)
 }
 
-// CreateTracker implements KcpObjectCountTracker
+// CreateTracker creates a cluster specific storage object count tracker
+// A goroutine is created to monitor incoming stop signals from different sources.
 func (c *kcpStorageObjectCountTracker) CreateTracker(ctx context.Context, cluster string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -69,8 +64,8 @@ func (c *kcpStorageObjectCountTracker) CreateTracker(ctx context.Context, cluste
 		return // should return error?
 	}
 
-	// create cluster specific stopCh that will be closed either when the call context is canceled
-	// or when the global stop signal is received
+	// Create a cluster-specific stopCh that will be closed either when
+	// (1) the call context is canceled, or when (2) the global stop signal is received
 	stopCh := make(chan struct{})
 	go func() {
 		select {
@@ -78,12 +73,13 @@ func (c *kcpStorageObjectCountTracker) CreateTracker(ctx context.Context, cluste
 			close(stopCh)
 		case <-c.globalStopCh:
 			close(stopCh)
-		case <-stopCh: // this is needed (?) for a cluster specific stop caused by a DeleteTracker call
+		case <-stopCh: // for a cluster specific stop caused by a DeleteTracker call
 			return
 		}
 	}()
 
 	c.trackers[cluster] = newStoppableStorageObjectCountTracker(stopCh)
+	klog.Infof("StorageObjectCountTracker created: cluster %s", cluster)
 }
 
 // DeleteTracker delete the tracker of a specific cluster
@@ -99,8 +95,10 @@ func (c *kcpStorageObjectCountTracker) DeleteTracker(cluster string) {
 	// Send stop signal to the cluster specific tracker
 	t.Stop()
 	delete(c.trackers, cluster)
+	klog.Infof("StorageObjectCountTracker deleted: cluster %s", cluster)
 }
 
+// StartObserving starts an observer for a specific resource object type on a specific cluster
 func (c *kcpStorageObjectCountTracker) StartObserving(cluster string, resource string, getterFunc func() int64) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -112,6 +110,7 @@ func (c *kcpStorageObjectCountTracker) StartObserving(cluster string, resource s
 	tracker.StartObserving(resource, getterFunc)
 }
 
+// StopObserving stops the observer for a specific resource object type on a specific cluster
 func (c *kcpStorageObjectCountTracker) StopObserving(cluster string, resource string) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -119,5 +118,6 @@ func (c *kcpStorageObjectCountTracker) StopObserving(cluster string, resource st
 	if !ok {
 		return // should return error?
 	}
+	klog.Infof("StopObserving %s - %s", cluster, resource)
 	tracker.StopObserving(resource)
 }
