@@ -1,6 +1,9 @@
 package request
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // stoppableStorageObjectCountTracker is a cluster scoped
 // storage object count tracker
@@ -20,7 +23,6 @@ var _ StorageObjectCountTracker = &stoppableStorageObjectCountTracker{}
 // note that it also starts a goroutine for forwarding upstream stop signal
 func newStoppableStorageObjectCountTracker(stopSignal <-chan struct{}) *stoppableStorageObjectCountTracker {
 	stopCh := make(chan struct{})
-
 	// forward upstream stop signal to tracker stop channel
 	go func() {
 		select {
@@ -39,6 +41,7 @@ func newStoppableStorageObjectCountTracker(stopSignal <-chan struct{}) *stoppabl
 
 // Get function exposes the resource object count stored in the tracker
 func (t *stoppableStorageObjectCountTracker) Get(resource string) (int64, error) {
+	// TODO: should this function block till the object count is set at least once?
 	return t.tracker.Get(resource)
 }
 
@@ -54,7 +57,7 @@ func (t *stoppableStorageObjectCountTracker) Stop() {
 
 // StartObserving starts an observer for a specific resource type
 // getterFunc is supplied by the caller for accessing the storage layer
-func (t *stoppableStorageObjectCountTracker) StartObserving(resource string, getterFunc func() int64) {
+func (t *stoppableStorageObjectCountTracker) StartObserving(ctx context.Context, resource string, getterFunc func() int64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -66,7 +69,19 @@ func (t *stoppableStorageObjectCountTracker) StartObserving(resource string, get
 		getterFunc,
 		func(count int64) { t.Set(resource, count) },
 	)
-	observer.start(t.stopCh)
+
+	// Use a goroutine to monitor stop signals from different sources
+	stopCh := observer.start() // This stopCh will be closed if observer.stop() is called
+	go func() {
+		select {
+		case <-ctx.Done():
+			t.StopObserving(resource)
+		case <-t.stopCh:
+			t.StopObserving(resource)
+		case <-stopCh:
+		}
+	}()
+
 	t.observers[resource] = observer
 }
 

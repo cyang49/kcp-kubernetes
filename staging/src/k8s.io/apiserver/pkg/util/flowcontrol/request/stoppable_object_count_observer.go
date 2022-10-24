@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const observePeriod = 5 * time.Second
+const observePeriod = 1 * time.Second
 
 type storageObjectCountObserver struct {
 	getterFunc func() int64
@@ -18,28 +18,17 @@ func newStoppableStorageObjectCountObserver(getterFunc func() int64, setterFunc 
 	return &storageObjectCountObserver{
 		getterFunc: getterFunc,
 		setterFunc: setterFunc,
-		stopCh:     make(chan struct{}),
 	}
 }
 
-// start function creates two goroutines
-// One for forwarding the upstream stop signal to local observer stopCh
-// The other updates the object count by using the getter and setter functions
-func (o *storageObjectCountObserver) start(stopSignal <-chan struct{}) {
-	// For forwarding upstream stop signal to observer stop channel
-	go func() {
-		select {
-		case <-stopSignal:
-			close(o.stopCh)
-		case <-o.stopCh:
-		}
-	}()
-
-	// Observer goroutine
+// start function creates a goroutine that periodically updates the object count by using the getter and setter functions
+func (o *storageObjectCountObserver) start() <-chan struct{} {
+	o.stopCh = make(chan struct{})
 	go wait.Until(func() { o.setterFunc(o.getterFunc()) }, observePeriod, o.stopCh)
+	return o.stopCh
 }
 
-// stop function will stop the observer goroutines
+// stop function will stop the observer goroutine
 func (o *storageObjectCountObserver) stop() {
 	close(o.stopCh)
 }
