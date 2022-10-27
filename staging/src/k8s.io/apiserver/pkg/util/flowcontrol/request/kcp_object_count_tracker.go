@@ -20,9 +20,8 @@ type KcpStorageObjectCountTracker interface {
 	// DeleteTracker is used by SOCT controller to delete tracker when a cluster is deleted
 	DeleteTracker(cluster string)
 
-	UpdateObservers(ctx context.Context, cluster string, resourceNames []string, getterFuncs []func() int64)
 	StartObserving(ctx context.Context, cluster string, key string, getterFunc func() int64)
-	StopObserving(cluster string, key string)
+	// StopObserving(cluster string, key string)
 }
 
 type kcpStorageObjectCountTracker struct {
@@ -99,12 +98,6 @@ func (c *kcpStorageObjectCountTracker) DeleteTracker(cluster string) {
 	klog.Infof("StorageObjectCountTracker deleted: cluster %s", cluster)
 }
 
-func (c *kcpStorageObjectCountTracker) UpdateObservers(ctx context.Context, cluster string, resourceNames []string, getterFuncs []func() int64) {
-	for i := 0; i < len(resourceNames); i++ {
-		c.StartObserving(ctx, cluster, resourceNames[i], getterFuncs[i])
-	}
-}
-
 // StartObserving starts an observer for a specific resource object type on a specific cluster
 func (c *kcpStorageObjectCountTracker) StartObserving(ctx context.Context, cluster string, resource string, getterFunc func() int64) {
 	c.lock.RLock()
@@ -117,14 +110,14 @@ func (c *kcpStorageObjectCountTracker) StartObserving(ctx context.Context, clust
 	tracker.StartObserving(ctx, resource, getterFunc)
 }
 
-// StopObserving stops the observer for a specific resource object type on a specific cluster
-func (c *kcpStorageObjectCountTracker) StopObserving(cluster string, resource string) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	tracker, ok := c.trackers[cluster]
-	if !ok {
-		return // should return error?
-	}
-	klog.Infof("StopObserving %s - %s", cluster, resource)
-	tracker.StopObserving(resource)
-}
+// // StopObserving stops the observer for a specific resource object type on a specific cluster
+// func (c *kcpStorageObjectCountTracker) StopObserving(cluster string, resource string) {
+// 	c.lock.RLock()
+// 	defer c.lock.RUnlock()
+// 	tracker, ok := c.trackers[cluster]
+// 	if !ok {
+// 		return // should return error?
+// 	}
+// 	klog.Infof("StopObserving %s - %s", cluster, resource)
+// 	tracker.StopObserving(resource)
+// }
