@@ -75,6 +75,8 @@ type KcpObjectCountGetterFunc func(string, string) (int64, error)
 // number of watchers potentially interested in a given request.
 type watchCountGetterFunc func(*apirequest.RequestInfo) int
 
+type KcpWatchCountGetterFunc func(string, *apirequest.RequestInfo) int
+
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
@@ -86,10 +88,10 @@ func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCou
 	return estimator.estimate
 }
 
-func NewKcpWorkEstimator(objectCountFn KcpObjectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
+func NewKcpWorkEstimator(objectCountFn KcpObjectCountGetterFunc, watchCountFn KcpWatchCountGetterFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
 		listWorkEstimator:     newKcpListWorkEstimator(objectCountFn),
-		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
+		mutatingWorkEstimator: newKcpMutatingWorkEstimator(watchCountFn),
 	}
 	return estimator.estimate
 }

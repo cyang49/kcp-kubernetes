@@ -71,7 +71,7 @@ func truncateLogField(s string) string {
 func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
-	fcIfc utilflowcontrol.Interface,
+	fcIfc utilflowcontrol.DelegatorInterface,
 	workEstimator flowcontrolrequest.WorkEstimatorFunc,
 ) http.Handler {
 	if fcIfc == nil {

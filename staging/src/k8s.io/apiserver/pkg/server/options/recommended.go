@@ -27,8 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
@@ -136,12 +134,13 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
 
 			}
-			config.FlowControl = utilflowcontrol.New(
-				config.SharedInformerFactory,
-				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta2(),
-				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-				config.RequestTimeout/4,
-			)
+			// TODO(cyang49): Is this redundant? Removing it for testing interface changes
+			// config.FlowControl = utilflowcontrol.New(
+			// 	config.SharedInformerFactory,
+			// 	kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta2(),
+			// 	config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
+			// 	config.RequestTimeout/4,
+			// )
 		} else {
 			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
 		}

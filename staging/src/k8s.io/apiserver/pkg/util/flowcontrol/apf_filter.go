@@ -40,8 +40,7 @@ import (
 // controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 const ConfigConsumerAsFieldManager = "api-priority-and-fairness-config-consumer-v1"
 
-// Interface defines how the API Priority and Fairness filter interacts with the underlying system.
-type Interface interface {
+type commonOperations interface {
 	// Handle takes care of queuing and dispatching a request
 	// characterized by the given digest.  The given `noteFn` will be
 	// invoked with the results of request classification.
@@ -76,9 +75,22 @@ type Interface interface {
 
 	// Install installs debugging endpoints to the web-server.
 	Install(c *mux.PathRecorderMux)
+}
+
+// Interface defines how the API Priority and Fairness filter interacts with the underlying system.
+type Interface interface {
+	commonOperations
 
 	// WatchTracker provides the WatchTracker interface.
 	WatchTracker
+}
+
+// DelegatorInterface defines how the API Priority and Fairness delegator interacts with the underlying system
+type DelegatorInterface interface {
+	commonOperations
+
+	// WatchTracker provides the WatchTracker interface.
+	KcpWatchTracker
 }
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md

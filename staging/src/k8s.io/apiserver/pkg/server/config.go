@@ -118,7 +118,8 @@ type Config struct {
 	CorsAllowedOriginList []string
 	HSTSDirectives        []string
 	// FlowControl, if not nil, gives priority and fairness to request handling
-	FlowControl utilflowcontrol.Interface
+	// FlowControl utilflowcontrol.Interface
+	FlowControl utilflowcontrol.DelegatorInterface
 
 	EnableIndex     bool
 	EnableProfiling bool
@@ -373,9 +374,9 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:                  genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:                 lifecycleSignals,
-		StorageObjectCountTracker:        flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		LongRunningFunc:  genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals: lifecycleSignals,
+		// StorageObjectCountTracker:        flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
 		KcpStorageObjectCountTracker:     flowcontrolrequest.NewKcpObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
 		StorageObjectCountGetterRegistry: flowcontrolrequest.NewStorageObjectCountGetterRegistry(),
 		APIServerID:                      id,
