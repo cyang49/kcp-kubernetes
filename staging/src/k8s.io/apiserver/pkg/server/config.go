@@ -377,7 +377,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LongRunningFunc:  genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		lifecycleSignals: lifecycleSignals,
 		// StorageObjectCountTracker:        flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
-		KcpStorageObjectCountTracker:     flowcontrolrequest.NewKcpObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		KcpStorageObjectCountTracker:     flowcontrolrequest.NewKcpStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
 		StorageObjectCountGetterRegistry: flowcontrolrequest.NewStorageObjectCountGetterRegistry(),
 		APIServerID:                      id,
 		StorageVersionManager:            storageversion.NewDefaultManager(),
