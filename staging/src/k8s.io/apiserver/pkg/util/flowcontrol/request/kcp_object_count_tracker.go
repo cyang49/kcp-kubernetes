@@ -102,6 +102,6 @@ func (c *kcpStorageObjectCountTracker) EnsureObserving(apiChangedCtx context.Con
 	if !ok {
 		return // should return error?
 	}
-	klog.Infof("StartObserving %s - %s", cluster, resource)
+	klog.Infof("EnsureObserving %s - %s", cluster, resource)
 	t.EnsureObserving(apiChangedCtx, resource, getterFunc)
 }
