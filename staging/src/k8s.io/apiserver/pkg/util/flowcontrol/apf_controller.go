@@ -221,9 +221,10 @@ func newTestableController(config TestableConfig) *configController {
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
-	fci := config.InformerFactory.Flowcontrol().V1beta2()
-	pli := fci.PriorityLevelConfigurations()
-	fsi := fci.FlowSchemas()
+	// fci := config.InformerFactory.Flowcontrol().V1beta2()
+
+	pli := config.PriorityLevelConfigurationInformer
+	fsi := config.FlowSchemaInformer
 	cfgCtlr.plLister = pli.Lister()
 	cfgCtlr.plInformerSynced = pli.Informer().HasSynced
 	cfgCtlr.fsLister = fsi.Lister()

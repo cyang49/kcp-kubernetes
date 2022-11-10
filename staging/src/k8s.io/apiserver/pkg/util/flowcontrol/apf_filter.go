@@ -28,7 +28,8 @@ import (
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
-	kubeinformers "k8s.io/client-go/informers"
+	flowcontrolv1beta2informers "k8s.io/client-go/informers/flowcontrol/v1beta2"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
@@ -97,24 +98,26 @@ type DelegatorInterface interface {
 
 // New creates a new instance to implement API priority and fairness
 func New(
-	informerFactory kubeinformers.SharedInformerFactory,
+	fsi flowcontrolv1beta2informers.FlowSchemaInformer,
+	pli flowcontrolv1beta2informers.PriorityLevelConfigurationInformer,
 	flowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
-		Name:                   "Controller",
-		Clock:                  clk,
-		AsFieldManager:         ConfigConsumerAsFieldManager,
-		FoundToDangling:        func(found bool) bool { return !found },
-		InformerFactory:        informerFactory,
-		FlowcontrolClient:      flowcontrolClient,
-		ServerConcurrencyLimit: serverConcurrencyLimit,
-		RequestWaitLimit:       requestWaitLimit,
-		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
+		Name:                               "Controller",
+		Clock:                              clk,
+		AsFieldManager:                     ConfigConsumerAsFieldManager,
+		FoundToDangling:                    func(found bool) bool { return !found },
+		FlowSchemaInformer:                 fsi,
+		PriorityLevelConfigurationInformer: pli,
+		FlowcontrolClient:                  flowcontrolClient,
+		ServerConcurrencyLimit:             serverConcurrencyLimit,
+		RequestWaitLimit:                   requestWaitLimit,
+		ReqsObsPairGenerator:               metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		ExecSeatsObsGenerator:              metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		QueueSetFactory:                    fqs.NewQueueSetFactory(clk),
 	})
 }
 
@@ -141,7 +144,9 @@ type TestableConfig struct {
 	FoundToDangling func(bool) bool
 
 	// InformerFactory to use in building the controller
-	InformerFactory kubeinformers.SharedInformerFactory
+	// InformerFactory kubeinformers.SharedInformerFactory
+	FlowSchemaInformer                 flowcontrolv1beta2informers.FlowSchemaInformer
+	PriorityLevelConfigurationInformer flowcontrolv1beta2informers.PriorityLevelConfigurationInformer
 
 	// FlowcontrolClient to use for manipulating config objects
 	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface
